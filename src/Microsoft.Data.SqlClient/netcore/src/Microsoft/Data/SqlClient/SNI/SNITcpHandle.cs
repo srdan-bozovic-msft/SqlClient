@@ -23,6 +23,7 @@ namespace Microsoft.Data.SqlClient.SNI
     internal sealed class SNITCPHandle : SNIPhysicalHandle
     {
         private readonly string _targetServer;
+        private readonly string _serverNameIndication;
         private readonly object _callbackObject;
         private readonly object _sendSync;
         private readonly Socket _socket;
@@ -118,10 +119,13 @@ namespace Microsoft.Data.SqlClient.SNI
         /// <param name="parallel">Parallel executions</param>
         /// <param name="cachedFQDN">Key for DNS Cache</param>
         /// <param name="pendingDNSInfo">Used for DNS Cache</param>
-        public SNITCPHandle(string serverName, int port, long timerExpire, object callbackObject, bool parallel, string cachedFQDN, ref SQLDNSInfo pendingDNSInfo)
+        /// <param name="isTDSS">Use TDSS</param>
+        /// <param name="serverNameIndication">Server Name Indication</param>
+        public SNITCPHandle(string serverName, int port, long timerExpire, object callbackObject, bool parallel, string cachedFQDN, ref SQLDNSInfo pendingDNSInfo, bool isTDSS, string serverNameIndication)
         {
             _callbackObject = callbackObject;
             _targetServer = serverName;
+            _serverNameIndication = serverNameIndication;
             _sendSync = new object();
 
             SQLDNSInfo cachedDNSInfo;
@@ -225,8 +229,15 @@ namespace Microsoft.Data.SqlClient.SNI
                 _socket.NoDelay = true;
                 _tcpStream = new SNINetworkStream(_socket, true);
 
-                _sslOverTdsStream = new SslOverTdsStream(_tcpStream);
-                _sslStream = new SNISslStream(_sslOverTdsStream, true, new RemoteCertificateValidationCallback(ValidateServerCertificate));
+                Stream stream = _tcpStream;
+
+                if (!isTDSS)
+                {
+                    _sslOverTdsStream = new SslOverTdsStream(_tcpStream);
+                    stream = _sslOverTdsStream;
+                }
+
+                _sslStream = new SNISslStream(stream, true, new RemoteCertificateValidationCallback(ValidateServerCertificate));
             }
             catch (SocketException se)
             {
@@ -502,8 +513,11 @@ namespace Microsoft.Data.SqlClient.SNI
 
             try
             {
-                _sslStream.AuthenticateAsClient(_targetServer);
-                _sslOverTdsStream.FinishHandshake();
+                _sslStream.AuthenticateAsClient(_serverNameIndication);
+                if (_sslOverTdsStream != null)
+                {
+                    _sslOverTdsStream.FinishHandshake();
+                }
             }
             catch (AuthenticationException aue)
             {
@@ -525,8 +539,11 @@ namespace Microsoft.Data.SqlClient.SNI
         {
             _sslStream.Dispose();
             _sslStream = null;
-            _sslOverTdsStream.Dispose();
-            _sslOverTdsStream = null;
+            if (_sslOverTdsStream != null)
+            {
+                _sslOverTdsStream.Dispose();
+                _sslOverTdsStream = null;
+            }
             _stream = _tcpStream;
         }
 

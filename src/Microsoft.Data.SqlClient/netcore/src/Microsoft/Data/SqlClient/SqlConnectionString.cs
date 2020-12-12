@@ -42,6 +42,7 @@ namespace Microsoft.Data.SqlClient
             internal const string Password = _emptyString;
             internal const bool Persist_Security_Info = false;
             internal const bool Pooling = true;
+            internal const bool TDSS = false;
             internal const bool TrustServerCertificate = false;
             internal const string Type_System_Version = _emptyString;
             internal const string User_ID = _emptyString;
@@ -91,6 +92,7 @@ namespace Microsoft.Data.SqlClient
             internal const string Password = "password";
             internal const string Persist_Security_Info = "persist security info";
             internal const string Pooling = "pooling";
+            internal const string TDSS = "tdss";
             internal const string TransactionBinding = "transaction binding";
             internal const string TrustServerCertificate = "trust server certificate";
             internal const string Type_System_Version = "type system version";
@@ -201,6 +203,7 @@ namespace Microsoft.Data.SqlClient
         private readonly bool _integratedSecurity;
 
         private readonly bool _encrypt;
+        private readonly bool _tdss;
         private readonly bool _trustServerCertificate;
         private readonly bool _enlist;
         private readonly bool _mars;
@@ -262,6 +265,7 @@ namespace Microsoft.Data.SqlClient
             _poolBlockingPeriod = ConvertValueToPoolBlockingPeriod();
 #endif
             _encrypt = ConvertValueToBoolean(KEY.Encrypt, DEFAULT.Encrypt);
+            _tdss = ConvertValueToBoolean(KEY.TDSS, DEFAULT.TDSS);
             _enlist = ConvertValueToBoolean(KEY.Enlist, DEFAULT.Enlist);
             _mars = ConvertValueToBoolean(KEY.MARS, DEFAULT.MARS);
             _persistSecurityInfo = ConvertValueToBoolean(KEY.Persist_Security_Info, DEFAULT.Persist_Security_Info);
@@ -493,6 +497,7 @@ namespace Microsoft.Data.SqlClient
         {
             _integratedSecurity = connectionOptions._integratedSecurity;
             _encrypt = connectionOptions._encrypt;
+            _tdss = connectionOptions._tdss;
 
             if (setEnlistValue.HasValue)
             {
@@ -551,6 +556,7 @@ namespace Microsoft.Data.SqlClient
         internal bool ConnectionReset { get { return true; } }
         //        internal bool EnableUdtDownload { get { return _enableUdtDownload;} }
         internal bool Encrypt { get { return _encrypt; } }
+        internal bool TDSS { get { return _tdss; } }
         internal bool TrustServerCertificate { get { return _trustServerCertificate; } }
         internal bool Enlist { get { return _enlist; } }
         internal bool MARS { get { return _mars; } }
@@ -675,6 +681,7 @@ namespace Microsoft.Data.SqlClient
                     { KEY.Persist_Security_Info, KEY.Persist_Security_Info },
                     { KEY.Pooling, KEY.Pooling },
                     { KEY.Replication, KEY.Replication },
+                    { KEY.TDSS, KEY.TDSS},
                     { KEY.TrustServerCertificate, KEY.TrustServerCertificate },
                     { KEY.TransactionBinding, KEY.TransactionBinding },
                     { KEY.Type_System_Version, KEY.Type_System_Version },

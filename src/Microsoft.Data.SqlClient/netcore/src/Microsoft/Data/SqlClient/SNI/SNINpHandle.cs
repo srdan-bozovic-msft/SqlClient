@@ -22,6 +22,7 @@ namespace Microsoft.Data.SqlClient.SNI
         private const int MAX_PIPE_INSTANCES = 255;
 
         private readonly string _targetServer;
+        private readonly string _serverNameIndication;
         private readonly object _callbackObject;
         private readonly object _sendSync;
 
@@ -38,7 +39,7 @@ namespace Microsoft.Data.SqlClient.SNI
         private int _bufferSize = TdsEnums.DEFAULT_LOGIN_PACKET_SIZE;
         private readonly Guid _connectionId = Guid.NewGuid();
 
-        public SNINpHandle(string serverName, string pipeName, long timerExpire, object callbackObject)
+        public SNINpHandle(string serverName, string pipeName, long timerExpire, bool isTDSS, string serverNameIndication, object callbackObject)
         {
             long scopeID = SqlClientEventSource.Log.TrySNIScopeEnterEvent("<sc.SNI.SNINpHandle.SNINpHandle |SNI|INFO|SCOPE> Constructor");
             SqlClientEventSource.Log.TrySNITraceEvent("<sc.SNI.SNINpHandle.SNINpHandle |SNI|INFO> Constructor. server name = {0}, pipe name = {1}", serverName, pipeName);
@@ -46,6 +47,7 @@ namespace Microsoft.Data.SqlClient.SNI
             {
                 _sendSync = new object();
                 _targetServer = serverName;
+                _serverNameIndication = serverNameIndication;
                 _callbackObject = callbackObject;
 
                 try
@@ -92,8 +94,14 @@ namespace Microsoft.Data.SqlClient.SNI
                     return;
                 }
 
-                _sslOverTdsStream = new SslOverTdsStream(_pipeStream);
-                _sslStream = new SNISslStream(_sslOverTdsStream, true, new RemoteCertificateValidationCallback(ValidateServerCertificate));
+                Stream stream = _pipeStream;
+
+                if (!isTDSS)
+                {
+                    _sslOverTdsStream = new SslOverTdsStream(_pipeStream);
+                    stream = _sslOverTdsStream;
+                }
+                _sslStream = new SNISslStream(stream, true, new RemoteCertificateValidationCallback(ValidateServerCertificate));
 
                 _stream = _pipeStream;
                 _status = TdsEnums.SNI_SUCCESS;
@@ -351,8 +359,11 @@ namespace Microsoft.Data.SqlClient.SNI
                 _validateCert = (options & TdsEnums.SNI_SSL_VALIDATE_CERTIFICATE) != 0;
                 try
                 {
-                    _sslStream.AuthenticateAsClient(_targetServer);
-                    _sslOverTdsStream.FinishHandshake();
+                    _sslStream.AuthenticateAsClient(_serverNameIndication);
+                    if (_sslOverTdsStream != null)
+                    {
+                        _sslOverTdsStream.FinishHandshake();
+                    }
                 }
                 catch (AuthenticationException aue)
                 {
@@ -377,8 +388,11 @@ namespace Microsoft.Data.SqlClient.SNI
         {
             _sslStream.Dispose();
             _sslStream = null;
-            _sslOverTdsStream.Dispose();
-            _sslOverTdsStream = null;
+            if (_sslOverTdsStream != null)
+            {
+                _sslOverTdsStream.Dispose();
+                _sslOverTdsStream = null;
+            }
 
             _stream = _pipeStream;
         }

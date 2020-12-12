@@ -350,10 +350,12 @@ namespace Microsoft.Data.SqlClient
             bool ignoreSniOpenTimeout,
             long timerExpire,
             bool encrypt,
+            bool tdss,
             bool trustServerCert,
             bool integratedSecurity,
             bool withFailover,
-            SqlAuthenticationMethod authType)
+            SqlAuthenticationMethod authType,
+            ApplicationIntent applicationIntent)
         {
             if (_state != TdsParserState.Closed)
             {
@@ -440,7 +442,9 @@ namespace Microsoft.Data.SqlClient
 
             // AD Integrated behaves like Windows integrated when connecting to a non-fedAuth server
             _physicalStateObj.CreatePhysicalSNIHandle(serverInfo.ExtendedServerName, ignoreSniOpenTimeout, timerExpire,
-                        out instanceName, ref _sniSpnBuffer, false, true, fParallel, FQDNforDNSCahce, ref _connHandler.pendingSQLDNSObject, integratedSecurity || authType == SqlAuthenticationMethod.ActiveDirectoryIntegrated);
+                        out instanceName, ref _sniSpnBuffer, false, true, fParallel, FQDNforDNSCahce, ref _connHandler.pendingSQLDNSObject, integratedSecurity || authType == SqlAuthenticationMethod.ActiveDirectoryIntegrated,
+                        tdss, serverInfo.ResolvedDatabaseName, applicationIntent
+                        );
 
             if (TdsEnums.SNI_SUCCESS != _physicalStateObj.Status)
             {
@@ -487,7 +491,7 @@ namespace Microsoft.Data.SqlClient
             }
 
             SqlClientEventSource.Log.TryTraceEvent("<sc.TdsParser.Connect|SEC> Sending prelogin handshake");
-            SendPreLoginHandshake(instanceName, encrypt);
+            SendPreLoginHandshake(instanceName, encrypt, tdss);
 
             _connHandler.TimeoutErrorInternal.EndPhase(SqlConnectionTimeoutErrorPhase.SendPreLoginHandshake);
             _connHandler.TimeoutErrorInternal.SetAndBeginPhase(SqlConnectionTimeoutErrorPhase.ConsumePreLoginHandshake);
@@ -504,7 +508,7 @@ namespace Microsoft.Data.SqlClient
                 // On Instance failure re-connect and flush SNI named instance cache.
                 _physicalStateObj.SniContext = SniContext.Snix_Connect;
 
-                _physicalStateObj.CreatePhysicalSNIHandle(serverInfo.ExtendedServerName, ignoreSniOpenTimeout, timerExpire, out instanceName, ref _sniSpnBuffer, true, true, fParallel, FQDNforDNSCahce, ref _connHandler.pendingSQLDNSObject, integratedSecurity);
+                _physicalStateObj.CreatePhysicalSNIHandle(serverInfo.ExtendedServerName, ignoreSniOpenTimeout, timerExpire, out instanceName, ref _sniSpnBuffer, true, true, fParallel, FQDNforDNSCahce, ref _connHandler.pendingSQLDNSObject, integratedSecurity, tdss, serverInfo.ResolvedDatabaseName, applicationIntent);
 
                 if (TdsEnums.SNI_SUCCESS != _physicalStateObj.Status)
                 {
@@ -524,7 +528,7 @@ namespace Microsoft.Data.SqlClient
                     _physicalStateObj.AssignPendingDNSInfo(serverInfo.UserProtocol, FQDNforDNSCahce, ref _connHandler.pendingSQLDNSObject);
                 }
 
-                SendPreLoginHandshake(instanceName, encrypt);
+                SendPreLoginHandshake(instanceName, encrypt, tdss);
                 status = ConsumePreLoginHandshake(encrypt, trustServerCert, integratedSecurity, out marsCapable, out _connHandler._fedAuthRequired);
 
                 // Don't need to check for Sphinx failure, since we've already consumed
@@ -642,8 +646,37 @@ namespace Microsoft.Data.SqlClient
         }
 
 
-        private void SendPreLoginHandshake(byte[] instanceName, bool encrypt)
+        private void SendPreLoginHandshake(byte[] instanceName, bool encrypt, bool tdss)
         {
+            if (tdss == true)
+            {
+                uint info = TdsEnums.SNI_SSL_USE_SCHANNEL_CACHE;
+                info |= TdsEnums.SNI_SSL_IGNORE_CHANNEL_BINDINGS;
+
+                _encryptionOption = EncryptionOptions.NOT_SUP;
+                var error = _physicalStateObj.EnableSsl(ref info);
+
+                if (error != TdsEnums.SNI_SUCCESS)
+                {
+                    _physicalStateObj.AddError(ProcessSNIError(_physicalStateObj));
+                    ThrowExceptionAndWarning(_physicalStateObj);
+                }
+
+                int protocolVersion = 0;
+                WaitForSSLHandShakeToComplete(ref error, ref protocolVersion);
+
+                SslProtocols protocol = (SslProtocols)protocolVersion;
+                string warningMessage = protocol.GetProtocolWarning();
+                if (!string.IsNullOrEmpty(warningMessage))
+                {
+                    // This logs console warning of insecure protocol in use.
+                    _logger.LogWarning(_typeName, MethodBase.GetCurrentMethod().Name, warningMessage);
+                }
+
+                // create a new packet encryption changes the internal packet size
+                _physicalStateObj.ClearAllWritePackets();
+            }
+
             // PreLoginHandshake buffer consists of:
             // 1) Standard header, with type = MT_PRELOGIN
             // 2) Consecutive 5 bytes for each option, (1 byte length, 2 byte offset, 2 byte payload length)

@@ -59,6 +59,7 @@ namespace Microsoft.Data.SqlClient
             AttestationProtocol,
 
             CommandTimeout,
+            TDSS,
 
             // keep the count value last
             KeywordsCount

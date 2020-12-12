@@ -19,7 +19,12 @@ namespace Microsoft.Data.SqlClient.SNI
     {
         private const int DefaultSqlServerPort = 1433;
         private const int DefaultSqlServerDacPort = 1434;
+        private const int DefaultSqlServerTDSSPort = 4433;
         private const string SqlServerSpnHeader = "MSSQLSvc";
+        private const string TDSSSNIServerKey = "Server";
+        private const string TDSSSNIInstanceKey = "Instance";
+        private const string TDSSSNIDatabaseKey = "Database";
+        private const string TDSSSNIApplicationIntentKey = "ApplicationIntent";
 
         internal class SspiClientContextResult
         {
@@ -253,8 +258,11 @@ namespace Microsoft.Data.SqlClient.SNI
         /// <param name="isIntegratedSecurity"></param>
         /// <param name="cachedFQDN">Used for DNS Cache</param>
         /// <param name="pendingDNSInfo">Used for DNS Cache</param>
-        /// <returns>SNI handle</returns>
-        internal SNIHandle CreateConnectionHandle(object callbackObject, string fullServerName, bool ignoreSniOpenTimeout, long timerExpire, out byte[] instanceName, ref byte[] spnBuffer, bool flushCache, bool async, bool parallel, bool isIntegratedSecurity, string cachedFQDN, ref SQLDNSInfo pendingDNSInfo)
+        /// <param name="isTDSS">Use TDSS protocol</param>
+        /// <param name="databaseName">Used for Server Name Indication</param>
+        /// <param name="applicationIntent">Used for Server Name Indication</param>
+        /// /// <returns>SNI handle</returns>
+        internal SNIHandle CreateConnectionHandle(object callbackObject, string fullServerName, bool ignoreSniOpenTimeout, long timerExpire, out byte[] instanceName, ref byte[] spnBuffer, bool flushCache, bool async, bool parallel, bool isIntegratedSecurity, string cachedFQDN, ref SQLDNSInfo pendingDNSInfo, bool isTDSS, string databaseName, ApplicationIntent applicationIntent)
         {
             instanceName = new byte[1];
 
@@ -275,16 +283,18 @@ namespace Microsoft.Data.SqlClient.SNI
                 return null;
             }
 
+            string serverNameIndication = GetServerNameIndication(details, isTDSS, databaseName, applicationIntent);
+
             SNIHandle sniHandle = null;
             switch (details._connectionProtocol)
             {
                 case DataSource.Protocol.Admin:
                 case DataSource.Protocol.None: // default to using tcp if no protocol is provided
                 case DataSource.Protocol.TCP:
-                    sniHandle = CreateTcpHandle(details, timerExpire, callbackObject, parallel, cachedFQDN, ref pendingDNSInfo);
+                    sniHandle = CreateTcpHandle(details, timerExpire, callbackObject, parallel, cachedFQDN, ref pendingDNSInfo, isTDSS, serverNameIndication);
                     break;
                 case DataSource.Protocol.NP:
-                    sniHandle = CreateNpHandle(details, timerExpire, callbackObject, parallel);
+                    sniHandle = CreateNpHandle(details, timerExpire, callbackObject, parallel, isTDSS, serverNameIndication);
                     break;
                 default:
                     Debug.Fail($"Unexpected connection protocol: {details._connectionProtocol}");
@@ -304,6 +314,34 @@ namespace Microsoft.Data.SqlClient.SNI
             }
 
             return sniHandle;
+        }
+
+        private static string GetServerNameIndication(DataSource dataSource, bool isTDSS, string databaseName, ApplicationIntent applicationIntent)
+        {
+            if(!isTDSS)
+            {
+                return dataSource.ServerName;
+            }
+            StringBuilder result = new StringBuilder();
+
+            result.AppendFormat("{0}={1}", TDSSSNIServerKey, dataSource.ServerName);
+
+            if (!string.IsNullOrEmpty(dataSource.InstanceName))
+            {
+                result.AppendFormat(";{0}={1}", TDSSSNIInstanceKey, dataSource.InstanceName);
+            }
+
+            if (!string.IsNullOrEmpty(databaseName))
+            {
+                result.AppendFormat(";{0}={1}", TDSSSNIDatabaseKey, databaseName);
+            }
+
+            if (applicationIntent != ApplicationIntent.ReadWrite)
+            {
+                result.AppendFormat(";{0}={1}", TDSSSNIApplicationIntentKey, Enum.GetName(typeof(ApplicationIntent), applicationIntent));
+            }
+
+            return result.ToString();
         }
 
         private static byte[] GetSqlServerSPN(DataSource dataSource)
@@ -369,8 +407,10 @@ namespace Microsoft.Data.SqlClient.SNI
         /// <param name="parallel">Should MultiSubnetFailover be used</param>
         /// <param name="cachedFQDN">Key for DNS Cache</param>
         /// <param name="pendingDNSInfo">Used for DNS Cache</param>
+        /// <param name="isTDSS">Use TDSS</param>
+        /// <param name="serverNameIndication">Server Name Indication</param>
         /// <returns>SNITCPHandle</returns>
-        private SNITCPHandle CreateTcpHandle(DataSource details, long timerExpire, object callbackObject, bool parallel, string cachedFQDN, ref SQLDNSInfo pendingDNSInfo)
+        private SNITCPHandle CreateTcpHandle(DataSource details, long timerExpire, object callbackObject, bool parallel, string cachedFQDN, ref SQLDNSInfo pendingDNSInfo, bool isTDSS, string serverNameIndication)
         {
             // TCP Format:
             // tcp:<host name>\<instance name>
@@ -405,10 +445,11 @@ namespace Microsoft.Data.SqlClient.SNI
             }
             else
             {
-                port = isAdminConnection ? DefaultSqlServerDacPort : DefaultSqlServerPort;
+                port = isAdminConnection ? DefaultSqlServerDacPort : 
+                    (isTDSS ? DefaultSqlServerTDSSPort : DefaultSqlServerPort);
             }
 
-            return new SNITCPHandle(hostName, port, timerExpire, callbackObject, parallel, cachedFQDN, ref pendingDNSInfo);
+            return new SNITCPHandle(hostName, port, timerExpire, callbackObject, parallel, cachedFQDN, ref pendingDNSInfo, isTDSS, serverNameIndication);
         }
 
 
@@ -420,15 +461,17 @@ namespace Microsoft.Data.SqlClient.SNI
         /// <param name="timerExpire">Timer expiration</param>
         /// <param name="callbackObject">Asynchronous I/O callback object</param>
         /// <param name="parallel">Should MultiSubnetFailover be used. Only returns an error for named pipes.</param>
+        /// <param name="isTDSS">Use TDSS.</param>
+        /// <param name="serverNameIndication">Server Name Indication</param>
         /// <returns>SNINpHandle</returns>
-        private SNINpHandle CreateNpHandle(DataSource details, long timerExpire, object callbackObject, bool parallel)
+        private SNINpHandle CreateNpHandle(DataSource details, long timerExpire, object callbackObject, bool parallel, bool isTDSS, string serverNameIndication)
         {
             if (parallel)
             {
                 SNICommon.ReportSNIError(SNIProviders.NP_PROV, 0, SNICommon.MultiSubnetFailoverWithNonTcpProtocol, string.Empty);
                 return null;
             }
-            return new SNINpHandle(details.PipeHostName, details.PipeName, timerExpire, callbackObject);
+            return new SNINpHandle(details.PipeHostName, details.PipeName, timerExpire, isTDSS, serverNameIndication, callbackObject);
         }
 
         /// <summary>

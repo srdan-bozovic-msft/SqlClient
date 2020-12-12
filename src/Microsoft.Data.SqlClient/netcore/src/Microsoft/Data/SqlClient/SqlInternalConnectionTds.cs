@@ -1872,10 +1872,12 @@ namespace Microsoft.Data.SqlClient
                             ignoreSniOpenTimeout,
                             timeout.LegacyTimerExpire,
                             ConnectionOptions.Encrypt,
+                            ConnectionOptions.TDSS,
                             ConnectionOptions.TrustServerCertificate,
                             ConnectionOptions.IntegratedSecurity,
                             withFailover,
-                            ConnectionOptions.Authentication);
+                            ConnectionOptions.Authentication,
+                            ConnectionOptions.ApplicationIntent);
 
             _timeoutErrorInternal.EndPhase(SqlConnectionTimeoutErrorPhase.ConsumePreLoginHandshake);
             _timeoutErrorInternal.SetAndBeginPhase(SqlConnectionTimeoutErrorPhase.LoginBegin);
