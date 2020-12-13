@@ -442,8 +442,8 @@ namespace Microsoft.Data.SqlClient
 
             // AD Integrated behaves like Windows integrated when connecting to a non-fedAuth server
             _physicalStateObj.CreatePhysicalSNIHandle(serverInfo.ExtendedServerName, ignoreSniOpenTimeout, timerExpire,
-                        out instanceName, ref _sniSpnBuffer, false, true, fParallel, FQDNforDNSCahce, ref _connHandler.pendingSQLDNSObject, integratedSecurity || authType == SqlAuthenticationMethod.ActiveDirectoryIntegrated,
-                        tdss, serverInfo.ResolvedDatabaseName, applicationIntent
+                        out instanceName, ref _sniSpnBuffer, false, true, fParallel, FQDNforDNSCahce, ref _connHandler.pendingSQLDNSObject,
+                        ref tdss, serverInfo.ResolvedDatabaseName, applicationIntent, integratedSecurity || authType == SqlAuthenticationMethod.ActiveDirectoryIntegrated
                         );
 
             if (TdsEnums.SNI_SUCCESS != _physicalStateObj.Status)
@@ -508,7 +508,7 @@ namespace Microsoft.Data.SqlClient
                 // On Instance failure re-connect and flush SNI named instance cache.
                 _physicalStateObj.SniContext = SniContext.Snix_Connect;
 
-                _physicalStateObj.CreatePhysicalSNIHandle(serverInfo.ExtendedServerName, ignoreSniOpenTimeout, timerExpire, out instanceName, ref _sniSpnBuffer, true, true, fParallel, FQDNforDNSCahce, ref _connHandler.pendingSQLDNSObject, integratedSecurity, tdss, serverInfo.ResolvedDatabaseName, applicationIntent);
+                _physicalStateObj.CreatePhysicalSNIHandle(serverInfo.ExtendedServerName, ignoreSniOpenTimeout, timerExpire, out instanceName, ref _sniSpnBuffer, true, true, fParallel, FQDNforDNSCahce, ref _connHandler.pendingSQLDNSObject, ref tdss, serverInfo.ResolvedDatabaseName, applicationIntent, integratedSecurity);
 
                 if (TdsEnums.SNI_SUCCESS != _physicalStateObj.Status)
                 {

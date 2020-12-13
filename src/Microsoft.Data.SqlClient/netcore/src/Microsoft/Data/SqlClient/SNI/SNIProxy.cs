@@ -262,7 +262,7 @@ namespace Microsoft.Data.SqlClient.SNI
         /// <param name="databaseName">Used for Server Name Indication</param>
         /// <param name="applicationIntent">Used for Server Name Indication</param>
         /// /// <returns>SNI handle</returns>
-        internal SNIHandle CreateConnectionHandle(object callbackObject, string fullServerName, bool ignoreSniOpenTimeout, long timerExpire, out byte[] instanceName, ref byte[] spnBuffer, bool flushCache, bool async, bool parallel, bool isIntegratedSecurity, string cachedFQDN, ref SQLDNSInfo pendingDNSInfo, bool isTDSS, string databaseName, ApplicationIntent applicationIntent)
+        internal SNIHandle CreateConnectionHandle(object callbackObject, string fullServerName, bool ignoreSniOpenTimeout, long timerExpire, out byte[] instanceName, ref byte[] spnBuffer, bool flushCache, bool async, bool parallel, bool isIntegratedSecurity, string cachedFQDN, ref SQLDNSInfo pendingDNSInfo, ref bool isTDSS, string databaseName, ApplicationIntent applicationIntent)
         {
             instanceName = new byte[1];
 
@@ -278,6 +278,10 @@ namespace Microsoft.Data.SqlClient.SNI
             fullServerName = localDBDataSource ?? fullServerName;
 
             DataSource details = DataSource.ParseServerName(fullServerName);
+
+            // If a port is set explicitly to 4433 infer TDSS connection.
+            isTDSS = details.Port == 4433 ? true : isTDSS;
+
             if (details == null)
             {
                 return null;

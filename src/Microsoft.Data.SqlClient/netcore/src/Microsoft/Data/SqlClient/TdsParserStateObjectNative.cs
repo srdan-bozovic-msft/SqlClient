@@ -138,7 +138,7 @@ namespace Microsoft.Data.SqlClient
             return myInfo;
         }
 
-        internal override void CreatePhysicalSNIHandle(string serverName, bool ignoreSniOpenTimeout, long timerExpire, out byte[] instanceName, ref byte[] spnBuffer, bool flushCache, bool async, bool fParallel, string cachedFQDN, ref SQLDNSInfo pendingDNSInfo, bool isIntegratedSecurity, bool isTDSS, string databaseName, ApplicationIntent applicationIntent)
+        internal override void CreatePhysicalSNIHandle(string serverName, bool ignoreSniOpenTimeout, long timerExpire, out byte[] instanceName, ref byte[] spnBuffer, bool flushCache, bool async, bool fParallel, string cachedFQDN, ref SQLDNSInfo pendingDNSInfo, ref bool isTDSS, string databaseName, ApplicationIntent applicationIntent, bool isIntegratedSecurity)
         {
             // We assume that the loadSSPILibrary has been called already. now allocate proper length of buffer
             spnBuffer = null;
