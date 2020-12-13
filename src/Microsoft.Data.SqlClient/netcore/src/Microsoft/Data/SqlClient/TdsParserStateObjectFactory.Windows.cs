@@ -17,7 +17,7 @@ namespace Microsoft.Data.SqlClient
 
         // If the appcontext switch is set then Use Managed SNI based on the value. Otherwise Native SNI.dll will be used by default.
         public static bool UseManagedSNI { get; } =
-            AppContext.TryGetSwitch(UseManagedNetworkingOnWindows, out shouldUseManagedSNI) ? shouldUseManagedSNI : false;
+            AppContext.TryGetSwitch(UseManagedNetworkingOnWindows, out shouldUseManagedSNI) ? shouldUseManagedSNI : true;
 
         public EncryptionOptions EncryptionOptions
         {
