@@ -1227,6 +1227,9 @@ namespace Microsoft.Data.Common
         //internal const string TransparentNetworkIPResolution = TRANSPARENTNETWORKIPRESOLUTION;
         internal const string TRANSPARENTNETWORKIPRESOLUTION = "transparentnetworkipresolution";
 
+        //internal const string TDSS = TDSS;
+        internal const string TDSS = "tdss";
+
         //internal const string UserID                 = UID+","+User;
         internal const string UID = "uid";
         internal const string User = "user";

@@ -716,6 +716,7 @@ namespace Microsoft.Data.Common
         internal const bool PersistSecurityInfo = false;
         internal const bool Pooling = true;
         internal const bool TrustServerCertificate = false;
+        internal const bool TDSS = false;
         internal const string TypeSystemVersion = "Latest";
         internal const string UserID = _emptyString;
         internal const bool UserInstance = false;
@@ -756,6 +757,7 @@ namespace Microsoft.Data.Common
         internal const string Replication = "Replication";
         internal const string TransactionBinding = "Transaction Binding";
         internal const string TrustServerCertificate = "Trust Server Certificate";
+        internal const string TDSS = "TDSS";
         internal const string TypeSystemVersion = "Type System Version";
         internal const string UserInstance = "User Instance";
         internal const string WorkstationID = "Workstation ID";

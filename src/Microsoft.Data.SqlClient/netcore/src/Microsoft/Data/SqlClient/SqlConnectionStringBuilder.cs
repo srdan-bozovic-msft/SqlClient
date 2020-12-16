@@ -96,6 +96,7 @@ namespace Microsoft.Data.SqlClient
 
         private bool _encrypt = DbConnectionStringDefaults.Encrypt;
         private bool _trustServerCertificate = DbConnectionStringDefaults.TrustServerCertificate;
+        private bool _tdss = DbConnectionStringDefaults.TDSS;
         private bool _enlist = DbConnectionStringDefaults.Enlist;
         private bool _integratedSecurity = DbConnectionStringDefaults.IntegratedSecurity;
         private bool _multipleActiveResultSets = DbConnectionStringDefaults.MultipleActiveResultSets;
@@ -184,6 +185,7 @@ namespace Microsoft.Data.SqlClient
             hash.Add(DbConnectionStringKeywords.Replication, Keywords.Replication);
             hash.Add(DbConnectionStringKeywords.TransactionBinding, Keywords.TransactionBinding);
             hash.Add(DbConnectionStringKeywords.TrustServerCertificate, Keywords.TrustServerCertificate);
+            hash.Add(DbConnectionStringKeywords.TDSS, Keywords.TDSS);
             hash.Add(DbConnectionStringKeywords.TypeSystemVersion, Keywords.TypeSystemVersion);
             hash.Add(DbConnectionStringKeywords.UserID, Keywords.UserID);
             hash.Add(DbConnectionStringKeywords.UserInstance, Keywords.UserInstance);
@@ -474,6 +476,17 @@ namespace Microsoft.Data.SqlClient
             {
                 SetValue(DbConnectionStringKeywords.Encrypt, value);
                 _encrypt = value;
+            }
+        }
+
+        /// <include file='../../../../../../../doc/snippets/Microsoft.Data.SqlClient/SqlConnectionStringBuilder.xml' path='docs/members[@name="SqlConnectionStringBuilder"]/TDSS/*' />
+        public bool TDSS
+        {
+            get { return _tdss; }
+            set
+            {
+                SetValue(DbConnectionStringKeywords.TDSS, value);
+                _tdss = value;
             }
         }
 
@@ -1107,6 +1120,9 @@ namespace Microsoft.Data.SqlClient
                 case Keywords.TrustServerCertificate:
                     _trustServerCertificate = DbConnectionStringDefaults.TrustServerCertificate;
                     break;
+                case Keywords.TDSS:
+                    _tdss = DbConnectionStringDefaults.TDSS;
+                    break;
                 case Keywords.TypeSystemVersion:
                     _typeSystemVersion = DbConnectionStringDefaults.TypeSystemVersion;
                     break;
@@ -1173,7 +1189,8 @@ namespace Microsoft.Data.SqlClient
         /// <include file='../../../../../../../doc/snippets/Microsoft.Data.SqlClient/SqlConnectionStringBuilder.xml' path='docs/members[@name="SqlConnectionStringBuilder"]/ShouldSerialize/*' />
         public override bool ShouldSerialize(string keyword)
         {
-            ADP.CheckArgumentNull(keyword, nameof(keyword));
+            if (string.IsNullOrEmpty(keyword))
+                return false;
             Keywords index;
             return s_keywords.TryGetValue(keyword, out index) && base.ShouldSerialize(s_validKeywords[(int)index]);
         }
