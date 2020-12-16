@@ -491,7 +491,7 @@ namespace Microsoft.Data.SqlClient
             }
 
             SqlClientEventSource.Log.TryTraceEvent("<sc.TdsParser.Connect|SEC> Sending prelogin handshake");
-            SendPreLoginHandshake(instanceName, encrypt, tdss);
+            SendPreLoginHandshake(instanceName, encrypt, tdss, trustServerCert, integratedSecurity);
 
             _connHandler.TimeoutErrorInternal.EndPhase(SqlConnectionTimeoutErrorPhase.SendPreLoginHandshake);
             _connHandler.TimeoutErrorInternal.SetAndBeginPhase(SqlConnectionTimeoutErrorPhase.ConsumePreLoginHandshake);
@@ -528,7 +528,7 @@ namespace Microsoft.Data.SqlClient
                     _physicalStateObj.AssignPendingDNSInfo(serverInfo.UserProtocol, FQDNforDNSCahce, ref _connHandler.pendingSQLDNSObject);
                 }
 
-                SendPreLoginHandshake(instanceName, encrypt, tdss);
+                SendPreLoginHandshake(instanceName, encrypt, tdss, trustServerCert, integratedSecurity);
                 status = ConsumePreLoginHandshake(encrypt, trustServerCert, integratedSecurity, out marsCapable, out _connHandler._fedAuthRequired);
 
                 // Don't need to check for Sphinx failure, since we've already consumed
@@ -646,12 +646,22 @@ namespace Microsoft.Data.SqlClient
         }
 
 
-        private void SendPreLoginHandshake(byte[] instanceName, bool encrypt, bool tdss)
+        private void SendPreLoginHandshake(byte[] instanceName, bool encrypt, bool tdss, bool trustServerCert, bool integratedSecurity)
         {
             if (tdss == true)
             {
-                uint info = TdsEnums.SNI_SSL_USE_SCHANNEL_CACHE;
-                info |= TdsEnums.SNI_SSL_IGNORE_CHANNEL_BINDINGS;
+                // Validate Certificate if Trust Server Certificate=false and Encryption forced (EncryptionOptions.ON) from Server.
+                bool shouldValidateServerCert = (!trustServerCert) || (_connHandler._accessTokenInBytes != null && !trustServerCert);
+                uint info = (shouldValidateServerCert ? TdsEnums.SNI_SSL_VALIDATE_CERTIFICATE : 0)
+                    | TdsEnums.SNI_SSL_USE_SCHANNEL_CACHE;
+
+                if (encrypt && !integratedSecurity)
+                {
+                    // optimization: in case of SQL Authentication and encryption, set SNI_SSL_IGNORE_CHANNEL_BINDINGS to let SNI
+                    // know that it does not need to allocate/retrieve the Channel Bindings from the SSL context.
+                    // This applies to Native SNI
+                    info |= TdsEnums.SNI_SSL_IGNORE_CHANNEL_BINDINGS;
+                }
 
                 _encryptionOption = EncryptionOptions.NOT_SUP;
                 var error = _physicalStateObj.EnableSsl(ref info);
