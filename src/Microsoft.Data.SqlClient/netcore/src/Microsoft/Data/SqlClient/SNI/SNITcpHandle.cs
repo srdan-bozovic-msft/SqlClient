@@ -507,6 +507,8 @@ namespace Microsoft.Data.SqlClient.SNI
         /// <summary>
         /// Enable SSL
         /// </summary>
+
+#if NETSTANDARD
         public override uint EnableSsl(uint options)
         {
             _validateCert = (options & TdsEnums.SNI_SSL_VALIDATE_CERTIFICATE) != 0;
@@ -531,6 +533,48 @@ namespace Microsoft.Data.SqlClient.SNI
             _stream = _sslStream;
             return TdsEnums.SNI_SUCCESS;
         }
+#else
+        public override uint EnableSsl(uint options)
+        {
+            _validateCert = (options & TdsEnums.SNI_SSL_VALIDATE_CERTIFICATE) != 0;
+            var sslOptions = new SslClientAuthenticationOptions
+            {
+                TargetHost = _serverNameIndication,
+                ClientCertificates = null,
+                EnabledSslProtocols = SslProtocols.None,
+                CertificateRevocationCheckMode = X509RevocationMode.NoCheck,
+                EncryptionPolicy = EncryptionPolicy.RequireEncryption,
+                ApplicationProtocols = new List<SslApplicationProtocol> {
+                    new SslApplicationProtocol("TDSS")
+                }
+            };
+
+            CancellationTokenSource source = new CancellationTokenSource();
+            CancellationToken token = source.Token;
+
+            try
+            {
+                _sslStream.AuthenticateAsClientAsync(sslOptions, token)
+                    .Wait();
+                if (_sslOverTdsStream != null)
+                {
+                    _sslOverTdsStream.FinishHandshake();
+                }
+            }
+            catch (AuthenticationException aue)
+            {
+                source.Cancel();
+                return ReportTcpSNIError(aue);
+            }
+            catch (InvalidOperationException ioe)
+            {
+                return ReportTcpSNIError(ioe);
+            }
+
+            _stream = _sslStream;
+            return TdsEnums.SNI_SUCCESS;
+        }
+#endif
 
         /// <summary>
         /// Disable SSL
