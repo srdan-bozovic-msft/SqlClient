@@ -45,6 +45,7 @@ namespace Microsoft.Data.SqlClient
 
         // network protocol string constants
         public const string TCP = "tcp";
+        public const string QUIC = "quic";
         public const string NP = "np";
         public const string RPC = "rpc";
         public const string BV = "bv";

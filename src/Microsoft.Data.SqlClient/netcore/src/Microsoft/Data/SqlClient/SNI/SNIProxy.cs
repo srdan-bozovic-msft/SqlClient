@@ -87,6 +87,7 @@ namespace Microsoft.Data.SqlClient.SNI
                 case DataSource.Protocol.Admin:
                 case DataSource.Protocol.None: // default to using tcp if no protocol is provided
                 case DataSource.Protocol.TCP:
+                case DataSource.Protocol.QUIC:
                     sniHandle = CreateTcpHandle(details, timeout, parallel, ipPreference, cachedFQDN, ref pendingDNSInfo,
                         tlsFirst, hostNameInCertificate, serverCertificateFilename);
                     break;
@@ -130,7 +131,7 @@ namespace Microsoft.Data.SqlClient.SNI
             }
             else if (!string.IsNullOrWhiteSpace(dataSource.InstanceName))
             {
-                postfix = dataSource.ResolvedProtocol == DataSource.Protocol.TCP ? dataSource.ResolvedPort.ToString() : dataSource.InstanceName;
+                postfix = (dataSource.ResolvedProtocol == DataSource.Protocol.TCP || dataSource.ResolvedProtocol == DataSource.Protocol.QUIC) ? dataSource.ResolvedPort.ToString() : dataSource.InstanceName;
             }
 
             SqlClientEventSource.Log.TryTraceEvent("SNIProxy.GetSqlServerSPN | Info | ServerName {0}, InstanceName {1}, Port {2}, postfix {3}", dataSource?.ServerName, dataSource?.InstanceName, dataSource?.Port, postfix);
@@ -323,7 +324,7 @@ namespace Microsoft.Data.SqlClient.SNI
         private const string InstancePrefix = "MSSQL$";
         private const string PathSeparator = "\\";
 
-        internal enum Protocol { TCP, NP, None, Admin };
+        internal enum Protocol { TCP, QUIC, NP, None, Admin };
 
         /// <summary>
         /// Provides the HostName of the server to connect to for TCP protocol.
@@ -389,6 +390,8 @@ namespace Microsoft.Data.SqlClient.SNI
                     ReportSNIError(SNIProviders.NP_PROV);
                 else if (ResolvedProtocol == Protocol.TCP)
                     ReportSNIError(SNIProviders.TCP_PROV);
+                else if (ResolvedProtocol == Protocol.QUIC)
+                    ReportSNIError(SNIProviders.QUIC_PROV);
             }
         }
 
@@ -407,6 +410,9 @@ namespace Microsoft.Data.SqlClient.SNI
                 {
                     case TdsEnums.TCP:
                         ResolvedProtocol = Protocol.TCP;
+                        break;
+                    case TdsEnums.QUIC:
+                        ResolvedProtocol = Protocol.QUIC;
                         break;
                     case TdsEnums.NP:
                         ResolvedProtocol = Protocol.NP;
@@ -536,7 +542,7 @@ namespace Microsoft.Data.SqlClient.SNI
                 {
                     ResolvedProtocol = Protocol.TCP;
                 }
-                else if (ResolvedProtocol != Protocol.TCP)
+                else if (!(ResolvedProtocol == Protocol.TCP || ResolvedProtocol == Protocol.QUIC))
                 {
                     // Parameter has been specified for non-TCP protocol. This is not allowed.
                     ReportSNIError(SNIProviders.INVALID_PROV);

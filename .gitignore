@@ -364,3 +364,5 @@ MigrationBackup/
 
 # Config Json file
 **/config.json
+/gitignore/SimpleClient
+/src/Microsoft.Data.SqlClient.sln
