@@ -55,7 +55,7 @@ namespace Microsoft.Data.SqlClient.SNI
                     _sslOverTdsStream = null;
                 }
 
-                if (_stream == null)
+                if (_stream != null)
                 {
                     _stream.Dispose();
                     _stream = null;

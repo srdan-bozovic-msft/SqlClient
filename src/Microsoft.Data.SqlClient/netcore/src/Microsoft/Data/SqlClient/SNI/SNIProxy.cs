@@ -167,7 +167,7 @@ namespace Microsoft.Data.SqlClient.SNI
             {
                 serverSpn += ":" + portOrInstanceName;
             }
-            else if (protocol == DataSource.Protocol.None || protocol == DataSource.Protocol.TCP) // Default is TCP
+            else if (protocol == DataSource.Protocol.None || protocol == DataSource.Protocol.TCP || protocol == DataSource.Protocol.QUIC) // Default is TCP
             {
                 string serverSpnWithDefaultPort = serverSpn + $":{DefaultSqlServerPort}";
                 // Set both SPNs with and without Port as Port is optional for default instance
