@@ -943,9 +943,11 @@ namespace Microsoft.Data.SqlClient.SNI
             return ReportQuicSNIError(nativeError, sniError, errorMessage);
         }
 
+        #if DEBUG
         public override void KillConnection()
         {
             _connection.DisposeAsync().AsTask().Wait();
         }
+        #endif
     }
 }
