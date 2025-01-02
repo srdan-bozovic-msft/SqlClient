@@ -27,12 +27,10 @@ namespace Microsoft.Data.SqlClient.SNI
         private readonly string _targetServer;
         private readonly object _sendSync;
 
-        private NetworkStream _tcpStream;
         private readonly string _hostNameInCertificate;
         private readonly string _serverCertificateFilename;
         private QuicConnection _connection;
         private QuicStream _stream;
-        private SslStream _sslStream;
         private SslOverTdsStream _sslOverTdsStream;
         private SNIAsyncCallback _receiveCallback;
         private SNIAsyncCallback _sendCallback;
@@ -57,20 +55,19 @@ namespace Microsoft.Data.SqlClient.SNI
                     _sslOverTdsStream = null;
                 }
 
-                if (_sslStream != null)
+                if (_stream == null)
                 {
-                    _sslStream.Dispose();
-                    _sslStream = null;
+                    _stream.Dispose();
+                    _stream = null;
                 }
 
-                if (_tcpStream != null)
+                if (_connection != null)
                 {
-                    _tcpStream.Dispose();
-                    _tcpStream = null;
+                    _connection.DisposeAsync();
+                    _connection = null;
                 }
 
                 //Release any references held by _stream.
-                _stream = null;
                 SqlClientEventSource.Log.TrySNITraceEvent(nameof(SNIQUICHandle), EventType.INFO, "Connection Id {0}, All streams disposed.", args0: _connectionId);
             }
         }
@@ -101,14 +98,7 @@ namespace Microsoft.Data.SqlClient.SNI
         {
             get
             {
-                try
-                {
-                    return (int)_sslStream.SslProtocol;
-                }
-                catch
-                {
-                    return base.ProtocolVersion;
-                }
+                return (int)SslProtocols.Tls13;
             }
         }
 
@@ -267,6 +257,14 @@ namespace Microsoft.Data.SqlClient.SNI
 
                     //_sslStream = new SNISslStream(stream, true, new RemoteCertificateValidationCallback(ValidateServerCertificate));
                     var clientConnectionOptions = new QuicClientConnectionOptions {
+                        // Used to abort stream if it's not properly closed by the user.
+                        // See https://www.rfc-editor.org/rfc/rfc9000#section-20.2
+                        DefaultStreamErrorCode = 0x0A, // Protocol-dependent error code.
+
+                        // Used to close the connection if it's not done by the user.
+                        // See https://www.rfc-editor.org/rfc/rfc9000#section-20.2
+                        DefaultCloseErrorCode = 0x0B, // Protocol-dependent error code.
+
                         ClientAuthenticationOptions = new SslClientAuthenticationOptions
                         {
                             ApplicationProtocols = new List<SslApplicationProtocol> { new SslApplicationProtocol("tds/8.0") },
@@ -794,7 +792,7 @@ namespace Microsoft.Data.SqlClient.SNI
                     else if (timeoutInMilliseconds == -1)
                     {
                         // SqlClient internally represents infinite timeout by -1, and for TcpClient this is translated to a timeout of 0
-                        _stream.ReadTimeout = 0;
+                        _stream.ReadTimeout = Timeout.Infinite;
                     }
                     else
                     {
@@ -849,7 +847,7 @@ namespace Microsoft.Data.SqlClient.SNI
                 }
                 finally
                 {
-                    _stream.ReadTimeout = 0;
+                    _stream.ReadTimeout = Timeout.Infinite;
                 }
             }
         }

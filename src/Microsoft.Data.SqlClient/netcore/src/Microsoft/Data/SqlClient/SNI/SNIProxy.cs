@@ -87,9 +87,12 @@ namespace Microsoft.Data.SqlClient.SNI
                 case DataSource.Protocol.Admin:
                 case DataSource.Protocol.None: // default to using tcp if no protocol is provided
                 case DataSource.Protocol.TCP:
-                case DataSource.Protocol.QUIC:
                     sniHandle = CreateTcpHandle(details, timeout, parallel, ipPreference, cachedFQDN, ref pendingDNSInfo,
                         tlsFirst, hostNameInCertificate, serverCertificateFilename);
+                    break;
+                case DataSource.Protocol.QUIC:
+                    sniHandle = CreateQuicHandle(details, timeout, parallel, ipPreference, cachedFQDN, ref pendingDNSInfo,
+                        hostNameInCertificate, serverCertificateFilename);
                     break;
                 case DataSource.Protocol.NP:
                     sniHandle = CreateNpHandle(details, timeout, parallel, tlsFirst, hostNameInCertificate, serverCertificateFilename);
@@ -239,6 +242,68 @@ namespace Microsoft.Data.SqlClient.SNI
 
             return new SNITCPHandle(hostName, port, timeout, parallel, ipPreference, cachedFQDN, ref pendingDNSInfo,
                 tlsFirst, hostNameInCertificate, serverCertificateFilename);
+        }
+
+        /// <summary>
+        /// Creates an SNIQUICHandle object
+        /// </summary>
+        /// <param name="details">Data source</param>
+        /// <param name="timeout">Timer expiration</param>
+        /// <param name="parallel">Should MultiSubnetFailover be used</param>
+        /// <param name="ipPreference">IP address preference</param>
+        /// <param name="cachedFQDN">Key for DNS Cache</param>
+        /// <param name="pendingDNSInfo">Used for DNS Cache</param>
+        /// <param name="hostNameInCertificate">Host name in certificate</param>
+        /// <param name="serverCertificateFilename">Used for the path to the Server Certificate</param>
+        /// <returns>SNIQUICHandle</returns>
+        private static SNIQUICHandle CreateQuicHandle(
+            DataSource details,
+            TimeoutTimer timeout,
+            bool parallel,
+            SqlConnectionIPAddressPreference ipPreference,
+            string cachedFQDN,
+            ref SQLDNSInfo pendingDNSInfo,
+            string hostNameInCertificate,
+            string serverCertificateFilename)
+        {
+            // QUIC Format:
+            // quic:<host name>\<instance name>
+            // quic:<host name>,<UDP/IP port number>
+
+            string hostName = details.ServerName;
+            if (string.IsNullOrWhiteSpace(hostName))
+            {
+                SNILoadHandle.SingletonInstance.LastError = new SNIError(SNIProviders.QUIC_PROV, 0, SNICommon.InvalidConnStringError, Strings.SNI_ERROR_25);
+                return null;
+            }
+
+            int port = -1;
+            bool isAdminConnection = details.ResolvedProtocol == DataSource.Protocol.Admin;
+            if (details.IsSsrpRequired)
+            {
+                try
+                {
+                    details.ResolvedPort = port = isAdminConnection ?
+                            SSRP.GetDacPortByInstanceName(hostName, details.InstanceName, timeout, parallel, ipPreference) :
+                            SSRP.GetPortByInstanceName(hostName, details.InstanceName, timeout, parallel, ipPreference);
+                }
+                catch (SocketException se)
+                {
+                    SNILoadHandle.SingletonInstance.LastError = new SNIError(SNIProviders.QUIC_PROV, SNICommon.ErrorLocatingServerInstance, se);
+                    return null;
+                }
+            }
+            else if (details.Port != -1)
+            {
+                port = details.Port;
+            }
+            else
+            {
+                port = isAdminConnection ? DefaultSqlServerDacPort : DefaultSqlServerPort;
+            }
+
+            return new SNIQUICHandle(hostName, port, timeout, parallel, ipPreference, cachedFQDN, ref pendingDNSInfo,
+                hostNameInCertificate, serverCertificateFilename);
         }
 
         /// <summary>
