@@ -31,7 +31,6 @@ namespace Microsoft.Data.SqlClient.SNI
         private readonly string _serverCertificateFilename;
         private QuicConnection _connection;
         private QuicStream _stream;
-        private SslOverTdsStream _sslOverTdsStream;
         private SNIAsyncCallback _receiveCallback;
         private SNIAsyncCallback _sendCallback;
 
@@ -49,12 +48,6 @@ namespace Microsoft.Data.SqlClient.SNI
         {
             lock (this)
             {
-                if (_sslOverTdsStream != null)
-                {
-                    _sslOverTdsStream.Dispose();
-                    _sslOverTdsStream = null;
-                }
-
                 if (_stream != null)
                 {
                     _stream.Dispose();
