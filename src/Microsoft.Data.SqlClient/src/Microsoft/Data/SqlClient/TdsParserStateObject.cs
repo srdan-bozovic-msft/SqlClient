@@ -2862,7 +2862,7 @@ namespace Microsoft.Data.SqlClient
             internal void AppendPacketData(byte[] buffer, int read)
             {
                 Debug.Assert(buffer != null, "packet data cannot be null");
-                Debug.Assert(read >= TdsEnums.HEADER_LEN, "minimum packet length is TdsEnums.HEADER_LEN");
+                Debug.Assert(_firstPacket is not null || read >= TdsEnums.HEADER_LEN, "minimum packet length is TdsEnums.HEADER_LEN");
 #if DEBUG
                 for (PacketData current = _firstPacket; current != null; current = current.NextPacket)
                 {
