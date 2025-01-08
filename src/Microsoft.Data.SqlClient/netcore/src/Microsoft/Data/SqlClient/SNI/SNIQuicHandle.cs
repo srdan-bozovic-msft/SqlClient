@@ -48,15 +48,9 @@ namespace Microsoft.Data.SqlClient.SNI
         {
             lock (this)
             {
-                if (_stream != null)
-                {
-                    _stream.Dispose();
-                    _stream = null;
-                }
-
                 if (_connection != null)
                 {
-                    _connection.DisposeAsync();
+                    _connection.CloseAsync(0).AsTask().Wait();
                     _connection = null;
                 }
 
