@@ -172,6 +172,7 @@ namespace Microsoft.Data.SqlClient.SNI
             {
                 SqlClientEventSource.Log.TryTraceEvent("TdsParserStateObjectManaged.Dispose | Info | State Object Id {0}, Session Id {1}, Disposing session Handle and counters.", _objectID, sessionHandle.ConnectionId);
 
+                _marsConnection?.Dispose();
                 _marsConnection = null;
 
                 DisposeCounters();

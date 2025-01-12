@@ -267,7 +267,7 @@ namespace Microsoft.Data.SqlClient.SNI
         /// <param name="stream">Stream to read from</param>
         public void ReadFromStreamAsync(Stream stream)
         {
-            stream.ReadAsync(_data, 0, _dataCapacity, CancellationToken.None)
+            stream?.ReadAsync(_data, 0, _dataCapacity, CancellationToken.None)
                 .ContinueWith(
                     continuationAction: s_readCallback,
                     state: this,

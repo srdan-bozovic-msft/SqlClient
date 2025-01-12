@@ -12,7 +12,7 @@ namespace Microsoft.Data.SqlClient.SNI
     /// <summary>
     /// SNI MARS connection. Multiple MARS streams will be overlaid on this connection.
     /// </summary>
-    internal class SNIMarsConnection
+    internal class SNIMarsConnection : IDisposable
     {
         private readonly Guid _connectionId;
         private readonly Dictionary<int, SNIMarsHandle> _sessions;
@@ -24,6 +24,7 @@ namespace Microsoft.Data.SqlClient.SNI
         private int _currentHeaderByteCount;
         private int _dataBytesLeft;
         private SNIPacket _currentPacket;
+        private bool _disposedValue;
 
         /// <summary>
         /// Connection ID
@@ -137,6 +138,11 @@ namespace Microsoft.Data.SqlClient.SNI
 
                 lock (DemuxerSync)
                 {
+                    if(_disposedValue)
+                    {
+                        return TdsEnums.SNI_SUCCESS_IO_PENDING;
+                    }
+
                     var response = _lowerHandle.ReceiveAsync(ref packet);
 #if DEBUG
                     SqlClientEventSource.Log.TrySNITraceEvent(nameof(SNIMarsConnection), EventType.INFO, "MARS Session Id {0}, Received new packet {1}", args0: ConnectionId, args1: packet?._id);
@@ -204,6 +210,11 @@ namespace Microsoft.Data.SqlClient.SNI
         {
             using (TrySNIEventScope.Create(nameof(SNIMarsConnection)))
             {
+                if(_disposedValue)
+                {
+                    return;
+                }
+
                 SNISMUXHeader currentHeader = null;
                 SNIPacket currentPacket = null;
                 SNIMarsHandle currentSession = null;
@@ -337,6 +348,11 @@ namespace Microsoft.Data.SqlClient.SNI
 
                     lock (DemuxerSync)
                     {
+                        if(_disposedValue)
+                        {
+                            return;
+                        }
+
                         if (packet.DataLeft == 0)
                         {
                             sniErrorCode = ReceiveAsync(ref packet);
@@ -384,8 +400,40 @@ namespace Microsoft.Data.SqlClient.SNI
 
         public void ReturnPacket(SNIPacket packet)
         {
-            _lowerHandle.ReturnPacket(packet);
+            _lowerHandle?.ReturnPacket(packet);
         }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposedValue)
+            {
+                if (disposing)
+                {
+                    while (_sessions.Count > 0);
+                    _lowerHandle.Dispose();
+                    _lowerHandle = null;
+                }
+
+                // TODO: free unmanaged resources (unmanaged objects) and override finalizer
+                // TODO: set large fields to null
+                _disposedValue = true;
+            }
+        }
+
+        // // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
+        // ~SNIMarsConnection()
+        // {
+        //     // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+        //     Dispose(disposing: false);
+        // }
+
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
+
 
 #if DEBUG
         /// <summary>

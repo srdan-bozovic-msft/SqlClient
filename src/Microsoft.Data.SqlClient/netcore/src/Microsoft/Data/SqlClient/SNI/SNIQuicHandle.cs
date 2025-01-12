@@ -50,7 +50,7 @@ namespace Microsoft.Data.SqlClient.SNI
             {
                 if (_connection != null)
                 {
-                    _connection.CloseAsync(0).AsTask().Wait();
+                    _connection.DisposeAsync();
                     _connection = null;
                 }
 
